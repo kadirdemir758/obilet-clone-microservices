@@ -1,0 +1,198 @@
+// schema.prisma — Obilet Veritabanı Modelleri
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────
+// Otobüs Firması
+// ──────────────────────────────────────────
+model Company {
+  id      String @id @default(cuid())
+  name    String @unique
+  slug    String @unique
+  logoUrl String
+  phone   String?
+  website String?
+
+  buses   Bus[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("companies")
+}
+
+// ──────────────────────────────────────────
+// Otobüs
+// ──────────────────────────────────────────
+model Bus {
+  id          String      @id @default(cuid())
+  companyId   String
+  plateNo     String      @unique
+  model       String?
+  seatLayout  SeatLayout  @default(LAYOUT_2_1)
+  totalSeats  Int
+
+  company     Company     @relation(fields: [companyId], references: [id])
+  trips       Trip[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("buses")
+}
+
+// ──────────────────────────────────────────
+// Sefer
+// ──────────────────────────────────────────
+model Trip {
+  id            String    @id @default(cuid())
+  busId         String
+  origin        String
+  destination   String
+  departureTime DateTime
+  arrivalTime   DateTime
+  price         Decimal   @db.Decimal(10, 2)
+  currency      String    @default("TRY")
+  status        TripStatus @default(ACTIVE)
+
+  bus           Bus       @relation(fields: [busId], references: [id])
+  seats         Seat[]
+  tickets       Ticket[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([origin, destination, departureTime])
+  @@map("trips")
+}
+
+// ──────────────────────────────────────────
+// Koltuk
+// ──────────────────────────────────────────
+model Seat {
+  id          String      @id @default(cuid())
+  tripId      String
+  seatNumber  Int
+  status      SeatStatus  @default(EMPTY)
+  gender      Gender?     // Koltuk doluysa, sahibinin cinsiyeti
+
+  trip        Trip        @relation(fields: [tripId], references: [id])
+  ticket      Ticket?
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([tripId, seatNumber])
+  @@map("seats")
+}
+
+// ──────────────────────────────────────────
+// Yolcu
+// ──────────────────────────────────────────
+model Passenger {
+  id          String    @id @default(cuid())
+  firstName   String
+  lastName    String
+  birthDate   DateTime
+  gender      Gender
+  tckn        String    // Gerçek uygulamada şifrelenmiş saklanmalı
+
+  tickets     Ticket[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("passengers")
+}
+
+// ──────────────────────────────────────────
+// Bilet
+// ──────────────────────────────────────────
+model Ticket {
+  id          String        @id @default(cuid())
+  tripId      String
+  seatId      String        @unique
+  passengerId String
+  paymentId   String?
+  status      TicketStatus  @default(PENDING)
+  pnr         String        @unique // Bilet referans numarası
+
+  trip        Trip          @relation(fields: [tripId], references: [id])
+  seat        Seat          @relation(fields: [seatId], references: [id])
+  passenger   Passenger     @relation(fields: [passengerId], references: [id])
+  payment     Payment?      @relation(fields: [paymentId], references: [id])
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("tickets")
+}
+
+// ──────────────────────────────────────────
+// Ödeme
+// ──────────────────────────────────────────
+model Payment {
+  id              String        @id @default(cuid())
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("TRY")
+  status          PaymentStatus @default(PENDING)
+  iyzicoToken     String?       // Iyzico'dan dönen token
+  iyzicoPaymentId String?       // Iyzico ödeme ID'si
+  cardLastFour    String?
+  cardBrand       String?
+  errorCode       String?
+  errorMessage    String?
+
+  tickets         Ticket[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("payments")
+}
+
+// ──────────────────────────────────────────
+// Enum Tanımları
+// ──────────────────────────────────────────
+enum SeatLayout {
+  LAYOUT_2_1  // 2+1 (premium/lüks)
+  LAYOUT_2_2  // 2+2 (standart)
+}
+
+enum SeatStatus {
+  EMPTY
+  RESERVED   // Geçici rezervasyon (ödeme bekleniyor)
+  OCCUPIED   // Ödeme tamamlandı
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum TripStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+enum TicketStatus {
+  PENDING    // Ödeme bekleniyor
+  CONFIRMED  // Ödeme başarılı
+  CANCELLED  // İptal edildi
+  REFUNDED   // İade edildi
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
