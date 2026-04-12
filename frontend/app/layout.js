@@ -1,5 +1,5 @@
 import './globals.css';
-
+import AIAssistant from '@/components/AIAssistant';
 export const metadata = {
   title: 'Obilet Clone — Otobüs Bileti Rezervasyonu',
   description: 'Kamil Koç, Pamukkale, Metro Turizm ve daha fazlasından en uygun otobüs biletini kolayca satın alın.',
@@ -24,6 +24,7 @@ export default function RootLayout({ children }) {
           </div>
         </nav>
         {children}
+        <AIAssistant />
       </body>
     </html>
   );

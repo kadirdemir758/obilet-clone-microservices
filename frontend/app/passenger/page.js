@@ -2,51 +2,47 @@
 
 import { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { validateTCKN, formatTCKN } from '@/../../lib/tcknValidator';
-import { ticketsApi } from '@/../../lib/api';
+import { validateTCKN, formatTCKN } from '@/lib/tcknValidator';
+import { ticketsApi } from '@/lib/api';
 
 function PassengerContent() {
   const params = useSearchParams();
   const router = useRouter();
 
-  const tripId      = params.get('tripId');
-  const seatNumber  = parseInt(params.get('seatNumber'));
-  const price       = parseFloat(params.get('price'));
-  const gender      = params.get('gender'); // MALE | FEMALE
+  const tripId     = params.get('tripId');
+  const seatNumber = parseInt(params.get('seatNumber') || '0');
+  const price      = parseFloat(params.get('price') || '0');
+  const genderParam = params.get('gender') || '';
 
   const [form, setForm] = useState({
     firstName: '',
-    lastName: '',
+    lastName:  '',
     birthDate: '',
-    gender: gender || '',
-    tckn: '',
-    email: '',
-    phone: '',
+    gender:    genderParam,
+    tckn:      '',
+    email:     '',
+    phone:     '',
   });
 
-  const [errors, setErrors] = useState({});
-  const [tcknStatus, setTcknStatus] = useState(null); // null | {valid, message}
-  const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
+  const [errors, setErrors]       = useState({});
+  const [tcknStatus, setTcknStatus] = useState(null); // { valid, message }
+  const [loading, setLoading]     = useState(false);
+  const [apiError, setApiError]   = useState('');
 
-  // ─── Alan güncelleme ─────────────────────────────────
+  // ─── Alan güncelle ──────────────────────────────────
   function handleChange(field, value) {
     if (field === 'tckn') {
-      const formatted = formatTCKN(value);
-      setForm(f => ({ ...f, tckn: formatted }));
-      if (formatted.length === 11) {
-        const result = validateTCKN(formatted);
-        setTcknStatus(result);
-      } else {
-        setTcknStatus(null);
-      }
+      const cleaned = formatTCKN(value);
+      setForm((f) => ({ ...f, tckn: cleaned }));
+      setTcknStatus(cleaned.length === 11 ? validateTCKN(cleaned) : null);
+      setErrors((e) => ({ ...e, tckn: '' }));
       return;
     }
-    setForm(f => ({ ...f, [field]: value }));
-    if (errors[field]) setErrors(e => ({ ...e, [field]: '' }));
+    setForm((f) => ({ ...f, [field]: value }));
+    setErrors((e) => ({ ...e, [field]: '' }));
   }
 
-  // ─── Form doğrulama ───────────────────────────────────
+  // ─── Doğrulama ──────────────────────────────────────
   function validate() {
     const e = {};
     if (!form.firstName.trim()) e.firstName = 'Ad zorunludur.';
@@ -55,13 +51,13 @@ function PassengerContent() {
     if (!form.gender)            e.gender    = 'Cinsiyet zorunludur.';
     if (!form.tckn)              e.tckn      = 'TCKN zorunludur.';
     else {
-      const tcknResult = validateTCKN(form.tckn);
-      if (!tcknResult.valid) e.tckn = tcknResult.message;
+      const r = validateTCKN(form.tckn);
+      if (!r.valid) e.tckn = r.message;
     }
     return e;
   }
 
-  // ─── Form gönder ─────────────────────────────────────
+  // ─── Gönder ─────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
     const errs = validate();
@@ -80,12 +76,11 @@ function PassengerContent() {
           birthDate: form.birthDate,
           gender:    form.gender,
           tckn:      form.tckn,
-          email:     form.email,
-          phone:     form.phone,
+          email:     form.email.trim(),
+          phone:     form.phone.trim(),
         },
       });
 
-      // Başarılı — ödeme sayfasına yönlendir
       router.push(
         `/payment?ticketId=${result.ticket.id}&pnr=${result.ticket.pnr}&passengerId=${result.passenger.id}&price=${price}`
       );
@@ -96,13 +91,14 @@ function PassengerContent() {
     }
   }
 
-  const maxBirthDate = new Date();
-  maxBirthDate.setFullYear(maxBirthDate.getFullYear() - 2);
-  const maxBirthDateStr = maxBirthDate.toISOString().split('T')[0];
+  // Max doğum tarihi (en az 2 yaşında olmalı)
+  const maxBirth = new Date();
+  maxBirth.setFullYear(maxBirth.getFullYear() - 2);
+  const maxBirthStr = maxBirth.toISOString().split('T')[0];
 
   return (
     <div style={{ maxWidth: 700, margin: '2rem auto', padding: '0 1rem' }}>
-      {/* Adım göstergesi */}
+      {/* Adım Göstergesi */}
       <div className="stepper" style={{ marginBottom: '2rem' }}>
         {['Sefer Seç', 'Koltuk Seç', 'Yolcu Bilgileri', 'Ödeme'].map((step, i) => (
           <div key={step} className={`stepper__step${i === 2 ? ' active' : i < 2 ? ' done' : ''}`}>
@@ -121,8 +117,9 @@ function PassengerContent() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="form-grid">
+
             {/* Ad */}
             <div className="form-group">
               <label className="form-label" htmlFor="firstName">Ad <span>*</span></label>
@@ -131,7 +128,7 @@ function PassengerContent() {
                 type="text"
                 className={`form-input${errors.firstName ? ' error' : ''}`}
                 value={form.firstName}
-                onChange={e => handleChange('firstName', e.target.value)}
+                onChange={(e) => handleChange('firstName', e.target.value)}
                 placeholder="Adınız"
                 autoComplete="given-name"
               />
@@ -146,7 +143,7 @@ function PassengerContent() {
                 type="text"
                 className={`form-input${errors.lastName ? ' error' : ''}`}
                 value={form.lastName}
-                onChange={e => handleChange('lastName', e.target.value)}
+                onChange={(e) => handleChange('lastName', e.target.value)}
                 placeholder="Soyadınız"
                 autoComplete="family-name"
               />
@@ -161,8 +158,8 @@ function PassengerContent() {
                 type="date"
                 className={`form-input${errors.birthDate ? ' error' : ''}`}
                 value={form.birthDate}
-                max={maxBirthDateStr}
-                onChange={e => handleChange('birthDate', e.target.value)}
+                max={maxBirthStr}
+                onChange={(e) => handleChange('birthDate', e.target.value)}
               />
               {errors.birthDate && <span className="form-error">⚠ {errors.birthDate}</span>}
             </div>
@@ -174,7 +171,7 @@ function PassengerContent() {
                 id="gender"
                 className={`form-input${errors.gender ? ' error' : ''}`}
                 value={form.gender}
-                onChange={e => handleChange('gender', e.target.value)}
+                onChange={(e) => handleChange('gender', e.target.value)}
               >
                 <option value="">Seçin...</option>
                 <option value="MALE">♂ Erkek</option>
@@ -183,8 +180,8 @@ function PassengerContent() {
               {errors.gender && <span className="form-error">⚠ {errors.gender}</span>}
             </div>
 
-            {/* TCKN — Tam satır */}
-            <div className="form-group form-grid--full">
+            {/* TCKN — tam satır */}
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="form-label" htmlFor="tckn">
                 T.C. Kimlik Numarası <span>*</span>
               </label>
@@ -195,25 +192,20 @@ function PassengerContent() {
                 maxLength={11}
                 className={`form-input${errors.tckn ? ' error' : tcknStatus?.valid ? ' success' : ''}`}
                 value={form.tckn}
-                onChange={e => handleChange('tckn', e.target.value)}
+                onChange={(e) => handleChange('tckn', e.target.value)}
                 placeholder="11 haneli T.C. kimlik numaranız"
                 autoComplete="off"
               />
-              {/* Gerçek zamanlı TCKN feedback */}
+              {/* Gerçek zamanlı sayaç */}
               {form.tckn.length > 0 && form.tckn.length < 11 && (
-                <span style={{ fontSize: '0.75rem', color: '#ADB5BD' }}>
+                <span style={{ fontSize: '0.75rem', color: '#ADB5BD', marginTop: '4px' }}>
                   {form.tckn.length}/11 hane girildi
                 </span>
               )}
-              {tcknStatus && !tcknStatus.valid && (
-                <span className="form-error">⚠ {tcknStatus.message}</span>
-              )}
-              {tcknStatus && tcknStatus.valid && (
-                <span className="form-success">✅ {tcknStatus.message}</span>
-              )}
-              {errors.tckn && !tcknStatus && (
-                <span className="form-error">⚠ {errors.tckn}</span>
-              )}
+              {/* TCKN durum mesajları */}
+              {tcknStatus && !tcknStatus.valid && <span className="form-error">⚠ {tcknStatus.message}</span>}
+              {tcknStatus &&  tcknStatus.valid && <span className="form-success">✅ {tcknStatus.message}</span>}
+              {errors.tckn && !tcknStatus        && <span className="form-error">⚠ {errors.tckn}</span>}
             </div>
 
             {/* E-posta */}
@@ -224,7 +216,7 @@ function PassengerContent() {
                 type="email"
                 className="form-input"
                 value={form.email}
-                onChange={e => handleChange('email', e.target.value)}
+                onChange={(e) => handleChange('email', e.target.value)}
                 placeholder="eposta@ornek.com"
                 autoComplete="email"
               />
@@ -238,24 +230,20 @@ function PassengerContent() {
                 type="tel"
                 className="form-input"
                 value={form.phone}
-                onChange={e => handleChange('phone', e.target.value)}
+                onChange={(e) => handleChange('phone', e.target.value)}
                 placeholder="+90 5XX XXX XX XX"
                 autoComplete="tel"
               />
             </div>
           </div>
 
-          {/* Bilgilendirme */}
+          {/* KVKK Uyarısı */}
           <div className="alert alert--warning" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
-            🔒 Kişisel bilgileriniz şifrelenmiş olarak saklanmakta ve yalnızca bilet işlemleri için kullanılmaktadır.
+            🔒 Kişisel bilgileriniz şifrelenmiş şekilde saklanır ve yalnızca bilet işlemleri için kullanılır.
           </div>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              onClick={() => router.back()}
-            >
+            <button type="button" className="btn btn--secondary" onClick={() => router.back()}>
               ← Geri
             </button>
             <button

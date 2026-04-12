@@ -1,8 +1,20 @@
 version: '3.9'
 
+# ═══════════════════════════════════════════════════════════════
+#  Obilet — Mikroservis Mimarisi docker-compose
+#  Tüm servisler: http://localhost:8000 (API Gateway) üzerinden erişilir
+#
+#  Panel Adresleri:
+#    • API Gateway  → http://localhost:8000
+#    • Kafka UI     → http://localhost:8080
+#    • pgAdmin      → http://localhost:5050  (admin@obilet.com / admin123)
+#    • RedisInsight → http://localhost:5540
+# ═══════════════════════════════════════════════════════════════
+
 services:
+
   # ─────────────────────────────────────────
-  # PostgreSQL Veritabanı
+  # PostgreSQL — Ana Veritabanı
   # ─────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
@@ -17,6 +29,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init-schemas.sql
     networks:
       - obilet_network
     healthcheck:
@@ -26,35 +39,392 @@ services:
       retries: 5
 
   # ─────────────────────────────────────────
-  # pgAdmin — Veritabanı Yönetim Arayüzü
-  # Erişim: http://localhost:5050
-  # Email: admin@obilet.com | Şifre: admin123
+  # Redis — Cache & Session Store
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: obilet_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redis123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - obilet_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Zookeeper — Kafka Koordinatörü
+  # ─────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: obilet_zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=*"
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - obilet_network
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Apache Kafka — Event Bus
+  # İç ağ: kafka:9092 | Dış bağlantı: localhost:29092
+  # ─────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: obilet_kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - obilet_network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ─────────────────────────────────────────
+  # Kafka UI — http://localhost:8080
+  # ─────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: obilet_kafka_ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: obilet-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: "true"
+    ports:
+      - "8088:8080"
+    networks:
+      - obilet_network
+
+  # ─────────────────────────────────────────
+  # pgAdmin — http://localhost:5050
+  # admin@obilet.com / admin123
   # ─────────────────────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: obilet_pgadmin
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@obilet.com
       PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
       - obilet_network
+
+  # ─────────────────────────────────────────
+  # RedisInsight — http://localhost:5540
+  # ─────────────────────────────────────────
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: obilet_redisinsight
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight_data:/data
+    networks:
+      - obilet_network
+
+  # ═══════════════════════════════════════════════════════════════
+  #  MİKROSERVİSLER
+  # ═══════════════════════════════════════════════════════════════
+
+  # ─────────────────────────────────────────
+  # API Gateway (Nginx) — TEK GİRİŞ NOKTASI
+  # http://localhost:8000
+  # ─────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: obilet_api_gateway
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    networks:
+      - obilet_network
+    depends_on:
+      - auth-service
+      - user-service
+      - trip-service
+      - booking-service
+      - payment-service
+      - notification-service
+      - ai-assistant-service
+
+  # ─────────────────────────────────────────
+  # Auth Service — :8001
+  # POST /api/v1/auth/register, /login, /refresh, /logout
+  # GET  /api/v1/auth/me
+  # ─────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: obilet_auth_service
+    restart: unless-stopped
+    env_file:
+      - .env.microservices
+    environment:
+      SERVICE_NAME: auth-service
+      SERVICE_PORT: "8001"
+    ports:
+      - "8001:8001"
+    networks:
+      - obilet_network
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # User Service — :8002
+  # GET/PUT /api/v1/users/profile
+  # GET     /api/v1/users/{user_id}
+  # ─────────────────────────────────────────
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: obilet_user_service
+    restart: unless-stopped
+    env_file:
+      - .env.microservices
+    environment:
+      SERVICE_NAME: user-service
+      SERVICE_PORT: "8002"
+    ports:
+      - "8002:8002"
+    networks:
+      - obilet_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # Trip Service — :8003
+  # GET /api/v1/trips/search
+  # GET /api/v1/trips/{trip_id}
+  # GET /api/v1/trips/companies
+  # ─────────────────────────────────────────
+  trip-service:
+    build:
+      context: ./services/trip-service
+      dockerfile: Dockerfile
+    container_name: obilet_trip_service
+    restart: unless-stopped
+    env_file:
+      - .env.microservices
+    environment:
+      SERVICE_NAME: trip-service
+      SERVICE_PORT: "8003"
+    ports:
+      - "8003:8003"
+    networks:
+      - obilet_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ai-service:
+    build: ./services/ai-service
+    container_name: obilet_ai_service
+    ports:
+      - "9004:8004"
+    volumes:
+      - ./services/ai-service/app:/app/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8004 --reload
+    networks:
+      - obilet_network
+
+  # ─────────────────────────────────────────
+  # Booking Service — :8004
+  # POST   /api/v1/bookings
+  # GET    /api/v1/bookings/my
+  # GET    /api/v1/bookings/{id}
+  # DELETE /api/v1/bookings/{id}
+  # ─────────────────────────────────────────
+  booking-service:
+    build:
+      context: ./services/booking-service
+      dockerfile: Dockerfile
+    container_name: obilet_booking_service
+    restart: unless-stopped
+    env_file:
+      - .env.microservices
+    environment:
+      SERVICE_NAME: booking-service
+      SERVICE_PORT: "8004"
+    ports:
+      - "8004:8004"
+    networks:
+      - obilet_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # Payment Service — :8005
+  # POST /api/v1/payments/initiate
+  # POST /api/v1/payments/callback
+  # GET  /api/v1/payments/{id}
+  # ─────────────────────────────────────────
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: obilet_payment_service
+    restart: unless-stopped
+    env_file:
+      - .env.microservices
+    environment:
+      SERVICE_NAME: payment-service
+      SERVICE_PORT: "8005"
+    ports:
+      - "8005:8005"
+    networks:
+      - obilet_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # Notification Service — :8006
+  # Kafka consumer: booking.created, payment.completed, user.registered
+  # GET /api/v1/notifications/my
+  # ─────────────────────────────────────────
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: obilet_notification_service
+    restart: unless-stopped
+    env_file:
+      - .env.microservices
+    environment:
+      SERVICE_NAME: notification-service
+      SERVICE_PORT: "8006"
+    ports:
+      - "8006:8006"
+    networks:
+      - obilet_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────
+  # AI Assistant Service (RAG Middleware) — :8007
+  # GET/POST /api/v1/ai/chat
+  # ─────────────────────────────────────────
+  ai-assistant-service:
+    build:
+      context: ./services/ai-assistant-service
+      dockerfile: Dockerfile
+    container_name: obilet_ai_assistant_service
+    restart: unless-stopped
+    env_file:
+      - .env.microservices
+    environment:
+      SERVICE_NAME: ai-assistant-service
+      SERVICE_PORT: "8007"
+    ports:
+      - "8007:8007"
+    networks:
+      - obilet_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 # ─────────────────────────────────────────
-# Kalıcı Veri Hacimleri (Volumes)
+# Kalıcı Veri Hacimleri
 # ─────────────────────────────────────────
 volumes:
   postgres_data:
     driver: local
+  redis_data:
+    driver: local
+  kafka_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
   pgadmin_data:
+    driver: local
+  redisinsight_data:
     driver: local
 
 # ─────────────────────────────────────────
@@ -63,3 +433,4 @@ volumes:
 networks:
   obilet_network:
     driver: bridge
+    name: obilet_microservices_net

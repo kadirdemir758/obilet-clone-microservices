@@ -51,3 +51,33 @@ coverage/
 # Misc
 *.pem
 .vercel
+
+# ── Python Mikroservisler ──────────────────────────────────────
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/env/
+**/venv/
+**/.venv/
+**/.env
+**/*.egg-info/
+**/dist/
+**/build/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Mikroservis Çevre Değişkenleri (ASLA commit'leme!)
+.env.microservices
+
+# Alembic (migration dosyaları commit'lenir, __pycache__ değil)
+**/alembic/__pycache__/
+
+# Docker Volumes
+redis_data/
+kafka_data/
+zookeeper_data/
+zookeeper_logs/
+redisinsight_data/
