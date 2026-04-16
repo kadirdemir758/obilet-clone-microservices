@@ -1,87 +1,39 @@
-# 🚌 Obilet Clone — Otobüs Bileti Rezervasyon Sistemi
+# 🚌 Obilet Clone — Mikroservis Mimarili Bilet Rezervasyon Sistemi
 
-Türkiye'nin önde gelen otobüs firmalarını listeleyen, gerçek koltuk seçimi, TCKN doğrulama ve Iyzico ödeme entegrasyonu içeren modern bir otobüs bileti rezervasyon uygulaması.
+Bu proje, modern web teknolojileri ve mikroservis mimarisi kullanılarak geliştirilmiş kapsamlı bir otobüs bileti rezervasyon platformudur. Kullanıcılar sefer arayabilir, yapay zeka asistanı ile etkileşime geçebilir ve koltuk seçimi yaparak bilet satın alma süreçlerini simüle edebilirler.
 
-## 🛠️ Teknoloji Yığını
+## 🚀 Öne Çıkan Özellikler
+
+- **🤖 Yapay Zeka Entegreli Asistan:** Doğal dil işleme ile bilet arama ve kullanıcı desteği.
+- **🏗️ Mikroservis Mimarisi:** FastAPI ile güçlendirilmiş bağımsız servis yapıları.
+- **⚡ Modern Frontend:** Next.js (App Router) ile hızlı ve SEO uyumlu kullanıcı arayüzü.
+- **🐳 Dockerize Yapı:** Tüm sistem tek bir komutla (`docker-compose up`) ayağa kalkar.
+- **🎫 Dinamik Bilet Sorgulama:** PNR tabanlı dinamik bilet görüntüleme ve doğrulama simülasyonu.
+
+## 🛠️ Teknolojik Yığın (Tech Stack)
 
 | Katman | Teknoloji |
-|--------|-----------|
-| Frontend | Next.js 14 (App Router) |
-| Backend | Node.js + Express.js |
-| Veritabanı | PostgreSQL + Prisma ORM |
-| Ödeme | Iyzico |
-| Container | Docker + Docker Compose |
+| :--- | :--- |
+| **Frontend** | React, Next.js 14, Tailwind CSS |
+| **Backend** | Python, FastAPI |
+| **Veritabanı** | PostgreSQL, SQLAlchemy (Async) |
+| **Konteynerizasyon** | Docker, Docker Compose |
+| **Yapay Zeka** | Google Gemini API Entegrasyonu |
 
-## ✨ Özellikler
+## 📐 Sistem Mimarisi
 
-- 🏢 **Gerçek Firmalar**: Kamil Koç, Pamukkale, Metro Turizm, Ali Osman Ulusoy
-- 💺 **Dinamik Koltuk Seçimi**: 2+1 görsel otobüs düzeni
-- ⚧ **Cinsiyet Kuralı**: Yabancı kadın-erkek yan yana oturamaz
-- 🪪 **TCKN Doğrulama**: Gerçek algoritmik doğrulama
-- 💳 **Iyzico Ödeme**: 3D Secure kredi kartı entegrasyonu
+Sistem, istemci taleplerini karşılayan bir **API Gateway** ve bilet işlemlerini yöneten **Trip Service** olmak üzere modüler bir yapıdadır. Tüm servisler Docker ağında birbirleriyle izole ve güvenli bir şekilde iletişim kurar.
 
-## 🚀 Hızlı Başlangıç
+[Buraya Proje Ekran Görüntülerinden Birini Ekleyebilirsin: ![Ana Sayfa](./screenshots/home.png)]
 
-### Gereksinimler
-- Node.js v18+
-- Docker Desktop
-- Git
+## ⚙️ Kurulum ve Çalıştırma
 
-### Kurulum
+Projeyi yerel makinenizde çalıştırmak için Docker'ın yüklü olması yeterlidir:
 
-```bash
-# 1. Repository'yi klonla
-git clone <repo-url>
-cd obilet
+1. Depoyu klonlayın: `git clone https://github.com/kadir/obilet-clone.git`
+2. Proje dizinine gidin: `cd obilet-clone`
+3. Sistemi başlatın: `docker-compose up --build`
+4. Tarayıcıda açın: `http://localhost:3000`
 
-# 2. Docker ile veritabanını başlat
-docker-compose up -d
-
-# 3. Backend kurulumu
-cd backend
-cp .env.example .env
-npm install
-npx prisma migrate dev
-npx prisma db seed
-npm run dev
-
-# 4. Frontend kurulumu (yeni terminal)
-cd frontend
-cp .env.local.example .env.local
-npm install
-npm run dev
-```
-
-### Erişim
-
-| Servis | URL |
-|--------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:5000 |
-| pgAdmin | http://localhost:5050 |
-
-## 📁 Proje Yapısı
-
-```
-obilet/
-├── docker-compose.yml      # PostgreSQL + pgAdmin
-├── backend/                # Node.js + Express API
-│   ├── prisma/             # Veritabanı şemaları
-│   └── src/                # Kaynak kodlar
-└── frontend/               # Next.js 14 uygulaması
-```
-
-## 🔑 Çevre Değişkenleri
-
-Backend `.env` dosyası:
-```
-DATABASE_URL="postgresql://obilet:obilet123@localhost:5432/obiletdb"
-PORT=5000
-IYZICO_API_KEY=your_api_key_here
-IYZICO_SECRET_KEY=your_secret_key_here
-IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
-```
-
-## 📜 Lisans
-
-MIT
+---
+*Bu proje Kütahya Dumlupınar Üniversitesi (DPÜ) Yazılım Mühendisliği 1. Sınıf projesi kapsamında geliştirilmiştir.*

@@ -1,303 +1,328 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { tripsApi, seatsApi } from '@/lib/api';
 
-/**
- * BusSeatMap — Otobüs Koltuk Haritası Bileşeni
- *
- * 2+1 Düzeni (LAYOUT_2_1): Her satır [sol1][sol2] [koridor] [sağ1]
- * 2+2 Düzeni (LAYOUT_2_2): Her satır [sol1][sol2] [koridor] [sağ1][sağ2]
- */
-function BusSeatMap({ seats, layout, selectedSeat, onSeatClick, passengerGender }) {
-  function getSeatObj(seatNumber) {
-    return seats.find((s) => s.seatNumber === seatNumber) || null;
-  }
-
-  function getAdjacentSeatNumber(seatNumber) {
-    if (layout === 'LAYOUT_2_1') {
-      const row = Math.ceil(seatNumber / 3);
-      const pos = seatNumber - (row - 1) * 3;
-      if (pos === 1) return seatNumber + 1;
-      if (pos === 2) return seatNumber - 1;
-      return null; // 3. koltuk = tek taraf
-    }
-    // LAYOUT_2_2
-    const row = Math.ceil(seatNumber / 4);
-    const pos = seatNumber - (row - 1) * 4;
-    if (pos === 1) return seatNumber + 1;
-    if (pos === 2) return seatNumber - 1;
-    if (pos === 3) return seatNumber + 1;
-    if (pos === 4) return seatNumber - 1;
-    return null;
-  }
-
-  function isForbidden(seatNumber) {
-    if (!passengerGender) return false;
-    const adjNum = getAdjacentSeatNumber(seatNumber);
-    if (!adjNum) return false;
-    const adj = getSeatObj(adjNum);
-    if (!adj || adj.status === 'EMPTY') return false;
-    return adj.gender && adj.gender !== passengerGender;
-  }
-
-  function getSeatClass(seat) {
-    if (!seat) return 'seat seat--empty';
-    if (seat.seatNumber === selectedSeat) return 'seat seat--selected';
-    if (seat.status !== 'EMPTY') {
-      return seat.gender === 'MALE' ? 'seat seat--male' : 'seat seat--female';
-    }
-    if (isForbidden(seat.seatNumber)) return 'seat seat--forbidden';
-    return 'seat seat--empty';
-  }
-
-  function getSeatLabel(seat) {
-    if (!seat) return '';
-    if (seat.seatNumber === selectedSeat) return '✓';
-    if (seat.status === 'OCCUPIED') return seat.gender === 'MALE' ? '♂' : '♀';
-    if (seat.status === 'RESERVED') return '⏳';
-    return seat.seatNumber;
-  }
-
-  function handleClick(seat) {
-    if (!seat || seat.status !== 'EMPTY') return;
-    if (isForbidden(seat.seatNumber)) {
-      alert(
-        '⚠️ Cinsiyet kuralı: Yabancı kadın ve erkek yolcular yan yana oturamaz.\nLütfen farklı bir koltuk seçin.'
-      );
-      return;
-    }
-    onSeatClick(seat.seatNumber === selectedSeat ? null : seat.seatNumber);
-  }
-
-  // ─── 2+1 Render ─────────────────────────────────────
-  if (layout === 'LAYOUT_2_1') {
-    const rowCount = Math.ceil((seats.length || 45) / 3);
-    return (
-      <div className="seat-map__bus">
-        <div className="seat-map__driver">
-          <div className="seat-map__driver-seat">🧑‍✈️</div>
-        </div>
-        {Array.from({ length: rowCount }, (_, i) => {
-          const s1 = getSeatObj(i * 3 + 1);
-          const s2 = getSeatObj(i * 3 + 2);
-          const s3 = getSeatObj(i * 3 + 3);
-          return (
-            <div key={i} className="seat-map__row">
-              <span className="seat-map__row-num">{i + 1}</span>
-              <div className="seat-map__group">
-                <button className={getSeatClass(s1)} onClick={() => handleClick(s1)} disabled={!s1 || s1.status !== 'EMPTY'}>{getSeatLabel(s1)}</button>
-                <button className={getSeatClass(s2)} onClick={() => handleClick(s2)} disabled={!s2 || s2.status !== 'EMPTY'}>{getSeatLabel(s2)}</button>
-              </div>
-              <div className="seat-map__aisle" />
-              <div className="seat-map__group">
-                <button className={getSeatClass(s3)} onClick={() => handleClick(s3)} disabled={!s3 || s3.status !== 'EMPTY'}>{getSeatLabel(s3)}</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // ─── 2+2 Render ─────────────────────────────────────
-  const rowCount = Math.ceil((seats.length || 48) / 4);
-  return (
-    <div className="seat-map__bus">
-      <div className="seat-map__driver">
-        <div className="seat-map__driver-seat">🧑‍✈️</div>
-      </div>
-      {Array.from({ length: rowCount }, (_, i) => {
-        const s1 = getSeatObj(i * 4 + 1);
-        const s2 = getSeatObj(i * 4 + 2);
-        const s3 = getSeatObj(i * 4 + 3);
-        const s4 = getSeatObj(i * 4 + 4);
-        return (
-          <div key={i} className="seat-map__row">
-            <span className="seat-map__row-num">{i + 1}</span>
-            <div className="seat-map__group">
-              <button className={getSeatClass(s1)} onClick={() => handleClick(s1)} disabled={!s1 || s1.status !== 'EMPTY'}>{getSeatLabel(s1)}</button>
-              <button className={getSeatClass(s2)} onClick={() => handleClick(s2)} disabled={!s2 || s2.status !== 'EMPTY'}>{getSeatLabel(s2)}</button>
-            </div>
-            <div className="seat-map__aisle" />
-            <div className="seat-map__group">
-              <button className={getSeatClass(s3)} onClick={() => handleClick(s3)} disabled={!s3 || s3.status !== 'EMPTY'}>{getSeatLabel(s3)}</button>
-              <button className={getSeatClass(s4)} onClick={() => handleClick(s4)} disabled={!s4 || s4.status !== 'EMPTY'}>{getSeatLabel(s4)}</button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Ana Sayfa İçeriği ────────────────────────────────
 function SeatSelectionContent() {
-  const params = useSearchParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
+  
+  const tripId = searchParams.get('tripId');
+  const basePrice = parseFloat(searchParams.get('price') || '0');
 
-  const tripId = params.get('tripId');
-  const price  = parseFloat(params.get('price') || '0');
-
-  const [trip, setTrip]               = useState(null);
-  const [seats, setSeats]             = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState('');
-  const [selectedSeat, setSelectedSeat] = useState(null);
-  const [passengerGender, setPassengerGender] = useState('');
+  const [trip, setTrip] = useState(null);
+  const [selectedSeats, setSelectedSeats] = useState([]);
+  const [occupiedSeats, setOccupiedSeats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Modal Yönetimi İçin State'ler
+  const [selectingGenderFor, setSelectingGenderFor] = useState(null);
+  const [allowedGender, setAllowedGender] = useState('BOTH'); // 'K', 'E', veya 'BOTH'
 
   useEffect(() => {
-    if (!tripId) { setLoading(false); return; }
-    Promise.all([tripsApi.getById(tripId), seatsApi.getByTrip(tripId)])
-      .then(([tripData, seatData]) => {
-        setTrip(tripData.trip);
-        setSeats(seatData.seats);
+    if (!tripId) {
+      alert("Sefer bilgisi bulunamadı! Ana sayfaya yönlendiriliyorsunuz.");
+      router.push('/');
+      return;
+    }
+
+    fetch(`http://localhost:8000/api/v1/trips/${tripId}`)
+      .then(res => res.json())
+      .then(data => {
+        setTrip(data);
+        
+        // ❗ KURŞUN GEÇİRMEZ ALGORİTMA: Backend'den gelen numaralara simülasyon icabı cinsiyet atıyoruz
+        const fetchedOccupied = data.occupiedSeats || [2, 5, 6, 11, 15, 18, 22, 23, 28, 33];
+        const formattedOccupied = fetchedOccupied.map(seatNo => ({
+          seatNo,
+          gender: seatNo % 2 === 0 ? 'E' : 'K' // Çift numaralar Erkek, Tek numaralar Kadın simülasyonu
+        }));
+        setOccupiedSeats(formattedOccupied);
+        setLoading(false);
+
+        localStorage.setItem('currentTripId', tripId);
+        localStorage.setItem('currentBasePrice', basePrice);
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [tripId]);
+      .catch(err => {
+        console.error("Hata:", err);
+        setLoading(false);
+      });
+  }, [tripId, basePrice, router]);
 
-  function handleContinue() {
-    if (!selectedSeat) { alert('Lütfen bir koltuk seçin.'); return; }
-    if (!passengerGender) { alert('Lütfen cinsiyetinizi belirtin.'); return; }
-    router.push(
-      `/passenger?tripId=${tripId}&seatNumber=${selectedSeat}&price=${price}&gender=${passengerGender}`
+  // Yan koltuğu (partner koltuğu) bulma mantığı
+  const getPairedSeat = (seatNo) => {
+    // Son sıra (37, 38, 39, 40) için özel kural
+    if (seatNo >= 37) {
+      if (seatNo === 37) return 38;
+      if (seatNo === 38) return 37;
+      if (seatNo === 39) return 40;
+      if (seatNo === 40) return 39;
+    }
+    // Ana sıralar: Orta koltuk (+1 ile eşli), Sağ koltuk (-1 ile eşli)
+    if (seatNo % 3 === 2) return seatNo + 1;
+    if (seatNo % 3 === 0) return seatNo - 1;
+    // Tekli koltuk (Sol taraf) - Eşi yok
+    return null;
+  };
+
+  const toggleSeat = (seatNo) => {
+    const isOccupied = occupiedSeats.find(s => s.seatNo === seatNo);
+    if (isOccupied) return; // Dolu koltuğa tıklanamaz
+    
+    const existingSeat = selectedSeats.find(s => s.seatNo === seatNo);
+    
+    if (existingSeat) {
+      setSelectedSeats(selectedSeats.filter(s => s.seatNo !== seatNo));
+    } else {
+      if (selectedSeats.length >= 4) {
+        alert("En fazla 4 adet koltuk seçebilirsiniz.");
+        return;
+      }
+
+      // ❗ CİNSİYET KONTROLÜ: Yan koltukta kim oturuyor?
+      const pairedSeatNo = getPairedSeat(seatNo);
+      let restriction = 'BOTH';
+
+      if (pairedSeatNo) {
+        const pairedOccupied = occupiedSeats.find(s => s.seatNo === pairedSeatNo);
+        const pairedSelected = selectedSeats.find(s => s.seatNo === pairedSeatNo);
+
+        if (pairedOccupied) restriction = pairedOccupied.gender;
+        else if (pairedSelected) restriction = pairedSelected.gender;
+      }
+
+      setAllowedGender(restriction);
+      setSelectingGenderFor(seatNo);
+    }
+  };
+
+  const confirmGender = (gender) => {
+    setSelectedSeats([...selectedSeats, { seatNo: selectingGenderFor, gender }]);
+    setSelectingGenderFor(null); 
+  };
+
+  const handleContinue = () => {
+    if (selectedSeats.length === 0) {
+      alert("Lütfen devam etmek için en az 1 koltuk seçiniz.");
+      return;
+    }
+    
+    const totalPrice = selectedSeats.length * basePrice;
+    const seatNumbers = selectedSeats.map(s => s.seatNo).join(',');
+    
+    localStorage.setItem('selectedSeats', seatNumbers);
+    localStorage.setItem('selectedSeatsDetails', JSON.stringify(selectedSeats)); 
+    localStorage.setItem('currentTotalPrice', totalPrice);
+
+    router.push(`/passenger?tripId=${tripId}&seats=${seatNumbers}&price=${totalPrice}`);
+  };
+
+  const renderSeat = (seatNo) => {
+    const occupiedObj = occupiedSeats.find(s => s.seatNo === seatNo);
+    const selectedObj = selectedSeats.find(s => s.seatNo === seatNo);
+    
+    let bgColor = '#fff';
+    let borderColor = '#D1D5DB';
+    let textColor = '#374151';
+    let cursor = 'pointer';
+
+    if (occupiedObj) {
+      cursor = 'not-allowed';
+      // Dolu koltukların cinsiyetini soluk renklerle belli ediyoruz
+      if (occupiedObj.gender === 'K') {
+        bgColor = '#FCE4EC'; borderColor = '#F48FB1'; textColor = '#E91E63'; // Açık Pembe
+      } else {
+        bgColor = '#E3F2FD'; borderColor = '#90CAF9'; textColor = '#2196F3'; // Açık Mavi
+      }
+    } else if (selectedObj) {
+      // Senin seçtiğin koltuklar canlı renkli
+      if (selectedObj.gender === 'K') {
+        bgColor = '#E91E63'; borderColor = '#E91E63'; textColor = '#fff'; 
+      } else {
+        bgColor = '#2196F3'; borderColor = '#2196F3'; textColor = '#fff'; 
+      }
+    }
+
+    return (
+      <div
+        key={seatNo}
+        onClick={() => toggleSeat(seatNo)}
+        style={{
+          width: '45px', height: '45px', background: bgColor, border: `2px solid ${borderColor}`,
+          borderRadius: '8px 8px 4px 4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 'bold', cursor: cursor, transition: 'all 0.2s ease', userSelect: 'none', color: textColor,
+          boxShadow: selectedObj ? '0 4px 10px rgba(0,0,0,0.2)' : '0 2px 4px rgba(0,0,0,0.05)'
+        }}
+      >
+        {seatNo}
+      </div>
     );
-  }
+  };
 
-  if (loading) return <div className="loading-spinner" style={{ marginTop: '4rem' }} />;
-  if (error)   return <div className="alert alert--error" style={{ maxWidth: 600, margin: '2rem auto' }}>❌ {error}</div>;
-  if (!trip)   return null;
+  if (loading) return <div style={{textAlign: 'center', padding: '5rem', fontSize: '1.2rem'}}>🚌 Otobüs planı yükleniyor...</div>;
+  if (!trip) return null;
 
-  const layout     = trip.bus?.seatLayout || 'LAYOUT_2_1';
-  const emptyCount = seats.filter((s) => s.status === 'EMPTY').length;
-  const formattedPrice = new Intl.NumberFormat('tr-TR', {
-    style: 'currency', currency: 'TRY', maximumFractionDigits: 0,
-  }).format(price);
+  const totalPriceFormatted = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(selectedSeats.length * basePrice);
 
   return (
-    <div
-      style={{
-        maxWidth: 1100, margin: '0 auto', padding: '2rem 1rem',
-        display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2rem',
-      }}
-    >
-      {/* ─── Sol Kolon ────────────────────────────── */}
-      <div>
-        {/* Sefer Özeti */}
-        <div className="form-card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '1.25rem' }}>
-                {trip.origin} → {trip.destination}
-              </div>
-              <div style={{ color: '#6C757D', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {new Date(trip.departureTime).toLocaleString('tr-TR')} &nbsp;·&nbsp; {trip.bus?.company?.name}
-              </div>
+    <>
+      <div style={{ maxWidth: 1000, margin: '2rem auto', padding: '0 1rem', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        
+        {/* SOL: Otobüs Şeması */}
+        <div style={{ flex: '1', minWidth: '320px', background: '#fff', padding: '2rem', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1.5rem', textAlign: 'center', color: '#1F2937' }}>Koltuk Seçimi (2+1 Lüks)</h2>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '45px 45px 45px 45px', gap: '12px', background: '#F9FAFB', padding: '24px', borderRadius: '24px', width: 'max-content', margin: '0 auto', border: '4px solid #E5E7EB' }}>
+            <div style={{ gridColumn: '1 / -1', height: '60px', borderBottom: '3px dashed #D1D5DB', marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', paddingRight: '10px' }}>
+               <span style={{ fontSize: '24px' }}>🧭 Şoför</span>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FF6B35' }}>{formattedPrice}</div>
-              <div style={{ fontSize: '0.75rem', color: '#6C757D' }}>{emptyCount} boş koltuk</div>
-            </div>
+
+            {Array.from({ length: 13 }).map((_, rowIndex) => {
+              const leftSeat = rowIndex * 3 + 1;
+              const middleSeat = rowIndex * 3 + 2;
+              const rightSeat = rowIndex * 3 + 3;
+
+              if (rowIndex === 12) {
+                return (
+                  <React.Fragment key={rowIndex}>
+                    {renderSeat(leftSeat)}
+                    {renderSeat(leftSeat + 1)}
+                    {renderSeat(middleSeat + 1)}
+                    {renderSeat(rightSeat + 1)}
+                  </React.Fragment>
+                );
+              }
+
+              return (
+                <React.Fragment key={rowIndex}>
+                  {renderSeat(leftSeat)}
+                  <div style={{ width: '45px' }} />
+                  {renderSeat(middleSeat)}
+                  {renderSeat(rightSeat)}
+                </React.Fragment>
+              );
+            })}
+          </div>
+          
+          {/* Yeni Renk Kodları Lejantı */}
+          <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '1.2rem', marginTop: '2rem', fontSize: '0.80rem', fontWeight: 600, color: '#4B5563' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 14, height: 14, background: '#fff', border: '2px solid #D1D5DB', borderRadius: 3 }}></div> Boş</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 14, height: 14, background: '#FCE4EC', border: '2px solid #F48FB1', borderRadius: 3 }}></div> Dolu (Kadın)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 14, height: 14, background: '#E3F2FD', border: '2px solid #90CAF9', borderRadius: 3 }}></div> Dolu (Erkek)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 14, height: 14, background: '#E91E63', borderRadius: 3 }}></div> Seçili (Kadın)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 14, height: 14, background: '#2196F3', borderRadius: 3 }}></div> Seçili (Erkek)</div>
           </div>
         </div>
 
-        {/* Cinsiyet Seçimi */}
-        <div className="form-card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ fontWeight: 700, marginBottom: '0.75rem' }}>⚧ Cinsiyetiniz</div>
-          <div style={{ display: 'flex', gap: '2rem' }}>
-            {[{ val: 'MALE', label: '♂ Erkek', color: '#4A90D9' }, { val: 'FEMALE', label: '♀ Kadın', color: '#E91E8C' }].map((g) => (
-              <label key={g.val} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 600 }}>
-                <input
-                  type="radio"
-                  name="gender"
-                  value={g.val}
-                  checked={passengerGender === g.val}
-                  onChange={(e) => setPassengerGender(e.target.value)}
-                />
-                <span style={{ color: g.color }}>{g.label}</span>
-              </label>
-            ))}
-          </div>
-          {!passengerGender && (
-            <div className="alert alert--warning" style={{ marginTop: '0.75rem' }}>
-              ⚠️ Türkiye düzenlemesi gereği cinsiyetinizi seçmeden koltuk seçimi yapılamaz.
+        {/* SAĞ: Özet ve Sepet */}
+        <div style={{ flex: '1', minWidth: '320px', background: '#fff', padding: '2rem', borderRadius: '16px', border: '1px solid #E5E7EB', position: 'sticky', top: '2rem' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem', color: '#1F2937' }}>Sefer Özeti</h3>
+          
+          <div style={{ background: '#F3F4F6', padding: '1.25rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#6B7280', fontWeight: 600 }}>Güzergah:</span>
+              <span style={{ fontWeight: 800 }}>{trip.origin} → {trip.destination}</span>
             </div>
-          )}
-        </div>
-
-        {/* Koltuk Haritası */}
-        <div className="seat-map-wrapper">
-          <div className="seat-map__header">
-            <div className="seat-map__bus-icon">🚌</div>
-            <div className="seat-map__title">
-              {layout === 'LAYOUT_2_1' ? '2+1 Koltuk Düzeni' : '2+2 Koltuk Düzeni'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ color: '#6B7280', fontWeight: 600 }}>Firma:</span>
+              <span style={{ fontWeight: 800, color: '#3B5BDB' }}>{trip.company}</span>
             </div>
-            <div className="seat-map__subtitle">
-              {selectedSeat ? `Seçilen koltuk: ${selectedSeat}` : 'Bir koltuk seçin'}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#6B7280', fontWeight: 600 }}>Birim Fiyat:</span>
+              <span style={{ fontWeight: 800 }}>₺{basePrice}</span>
             </div>
           </div>
 
-          <BusSeatMap
-            seats={seats}
-            layout={layout}
-            selectedSeat={selectedSeat}
-            onSeatClick={setSelectedSeat}
-            passengerGender={passengerGender}
-          />
-
-          {/* Renk Efsanesi */}
-          <div className="seat-legend">
-            <div className="seat-legend__item"><div className="seat-legend__dot seat-legend__dot--empty" />Boş</div>
-            <div className="seat-legend__item"><div className="seat-legend__dot seat-legend__dot--male" />Erkek</div>
-            <div className="seat-legend__item"><div className="seat-legend__dot seat-legend__dot--female" />Kadın</div>
-            <div className="seat-legend__item"><div className="seat-legend__dot seat-legend__dot--selected" />Seçili</div>
+          <div style={{ borderTop: '2px dashed #E5E7EB', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <span style={{ color: '#6B7280', fontWeight: 600 }}>Seçilen Koltuklar:</span>
+              <div style={{ textAlign: 'right' }}>
+                {selectedSeats.length > 0 ? (
+                  selectedSeats.sort((a,b)=>a.seatNo - b.seatNo).map((s, idx) => (
+                    <div key={idx} style={{ fontWeight: 800, color: s.gender === 'K' ? '#E91E63' : '#2196F3', fontSize: '1.1rem', marginBottom: '4px' }}>
+                      {s.seatNo} <span style={{fontSize:'0.8rem'}}>({s.gender === 'K' ? 'Kadın' : 'Erkek'})</span>
+                    </div>
+                  ))
+                ) : (
+                  <span style={{ fontWeight: 800, color: '#FF6B35', fontSize: '1.2rem' }}>Seçilmedi</span>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#1F2937', fontWeight: 800, fontSize: '1.1rem' }}>Toplam Tutar:</span>
+              <span style={{ fontWeight: 900, fontSize: '1.8rem', color: '#1F2937' }}>{totalPriceFormatted}</span>
+            </div>
           </div>
+
+          <button 
+            onClick={handleContinue}
+            disabled={selectedSeats.length === 0}
+            style={{ width: '100%', padding: '1rem', background: selectedSeats.length === 0 ? '#D1D5DB' : '#FF6B35', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 800, cursor: selectedSeats.length === 0 ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}
+          >
+            Yolcu Bilgilerine Geç →
+          </button>
         </div>
       </div>
 
-      {/* ─── Sağ Kolon: Özet ─────────────────────── */}
-      <div>
-        <div className="form-card" style={{ position: 'sticky', top: '80px' }}>
-          <h2 className="form-card__title">Seçim Özeti</h2>
-
-          {selectedSeat ? (
-            <>
-              <div style={{ background: '#F8F9FA', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-                {[
-                  ['Koltuk No', selectedSeat],
-                  ['Güzergah', `${trip.origin} → ${trip.destination}`],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                    <span style={{ color: '#6C757D' }}>{k}</span>
-                    <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>{v}</span>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #E9ECEF', paddingTop: '0.75rem' }}>
-                  <span style={{ color: '#6C757D' }}>Tutar</span>
-                  <span style={{ fontWeight: 900, fontSize: '1.25rem', color: '#FF6B35' }}>{formattedPrice}</span>
-                </div>
-              </div>
-              <button id="continue-btn" className="btn btn--primary btn--full btn--lg" onClick={handleContinue}>
-                Yolcu Bilgileri →
+      {/* 🔥 KURALCI CİNSİYET SEÇİM MODALI */}
+      {selectingGenderFor && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="animate-fadeInUp" style={{ background: '#fff', padding: '2rem', borderRadius: '16px', textAlign: 'center', width: '90%', maxWidth: '400px', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>💺</div>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1F2937', marginBottom: '0.5rem' }}>
+              Koltuk No: <span style={{ color: '#FF6B35' }}>{selectingGenderFor}</span>
+            </h3>
+            <p style={{ color: '#6B7280', fontSize: '0.95rem', marginBottom: '1.5rem' }}>Lütfen bu koltuk için yolcu cinsiyetini seçiniz.</p>
+            
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              {/* KADIN BUTONU */}
+              <button 
+                onClick={() => allowedGender !== 'E' && confirmGender('K')} 
+                style={{ 
+                  flex: 1, background: '#E91E63', color: '#fff', border: 'none', padding: '1rem', borderRadius: '12px', 
+                  fontSize: '1.1rem', fontWeight: 800, cursor: allowedGender === 'E' ? 'not-allowed' : 'pointer', 
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                  opacity: allowedGender === 'E' ? 0.3 : 1, transition: 'transform 0.1s' 
+                }}
+                title={allowedGender === 'E' ? "Yan koltukta erkek yolcu oturduğu için seçilemez" : ""}
+              >
+                <span style={{ fontSize: '1.8rem' }}>👩</span> Kadın
               </button>
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', color: '#6C757D', padding: '2rem 0' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💺</div>
-              <p>Haritadan bir koltuk seçin</p>
+              
+              {/* ERKEK BUTONU */}
+              <button 
+                onClick={() => allowedGender !== 'K' && confirmGender('E')} 
+                style={{ 
+                  flex: 1, background: '#2196F3', color: '#fff', border: 'none', padding: '1rem', borderRadius: '12px', 
+                  fontSize: '1.1rem', fontWeight: 800, cursor: allowedGender === 'K' ? 'not-allowed' : 'pointer', 
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                  opacity: allowedGender === 'K' ? 0.3 : 1, transition: 'transform 0.1s' 
+                }}
+                title={allowedGender === 'K' ? "Yan koltukta kadın yolcu oturduğu için seçilemez" : ""}
+              >
+                <span style={{ fontSize: '1.8rem' }}>👨</span> Erkek
+              </button>
             </div>
-          )}
+
+            {allowedGender !== 'BOTH' && (
+              <div style={{ marginTop: '1rem', padding: '0.5rem', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', color: '#DC2626', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                * Yan koltuktaki yolcunun cinsiyeti nedeniyle diğer seçenek kilitlenmiştir.
+              </div>
+            )}
+            
+            <button onClick={() => setSelectingGenderFor(null)} style={{ marginTop: '1.5rem', background: 'transparent', border: 'none', color: '#9CA3AF', fontWeight: 600, textDecoration: 'underline', cursor: 'pointer' }}>
+              İptal Et
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
 
 export default function SeatSelectionPage() {
   return (
-    <Suspense fallback={<div className="loading-spinner" style={{ marginTop: '4rem' }} />}>
+    <Suspense fallback={<div style={{ textAlign: 'center', padding: '4rem' }}>Yükleniyor...</div>}>
       <SeatSelectionContent />
     </Suspense>
   );

@@ -24,3 +24,5 @@ aiokafka==0.11.0
 
 # ── HTTP Client (servisler arası iletişim) ────────────────────
 httpx==0.27.2
+asyncpg==0.29.0
+psycopg2-binary==2.9.9

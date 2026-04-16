@@ -18,7 +18,7 @@ export default function RootLayout({ children }) {
             </div>
             <div style={{ display: 'flex', gap: '1.5rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem' }}>
               <a href="/" style={{ color: 'rgba(255,255,255,0.7)' }}>Otobüs Biletleri</a>
-              <a href="#" style={{ color: 'rgba(255,255,255,0.7)' }}>Bilet Sorgula</a>
+              <a href="/sorgula" style={{ color: 'rgba(255,255,255,0.7)' }}>Bilet Sorgula</a>
               <a href="#" style={{ color: 'rgba(255,255,255,0.7)' }}>İletişim</a>
             </div>
           </div>

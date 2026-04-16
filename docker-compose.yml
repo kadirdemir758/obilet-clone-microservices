@@ -389,7 +389,7 @@ services:
   # ─────────────────────────────────────────
   ai-assistant-service:
     build:
-      context: ./services/ai-assistant-service
+      context: ./services/ai-service
       dockerfile: Dockerfile
     container_name: obilet_ai_assistant_service
     restart: unless-stopped

@@ -1,41 +1,135 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import sessionmaker, Session, declarative_base
-from typing import List
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import declarative_base
 
-# Veritabanı Bağlantısı
-DATABASE_URL = "postgresql://obilet:obilet123@postgres:5432/obiletdb"
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# Kendi dosyalarımızdan import ediyoruz
+from app.routers import trips
+from app.database import engine, Base
 
-# Veritabanı Modeli (seed.py ile aynı olmalı)
-class City(Base):
-    __tablename__ = "cities"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True)
-
-app = FastAPI(title="Obilet Trip Service")
-
-# Veritabanı Bağlantı Yardımcısı
-def get_db():
-    db = SessionLocal()
+# --- 🚀 Modern Lifespan Yapısı ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # [STARTUP]: Uygulama Başlarken Çalışır
+    print("🚀 Trip Service (Async) başlatılıyor...")
     try:
-        yield db
-    finally:
-        db.close()
+        # Tabloları asenkron olarak oluşturuyoruz (run_sync hatasını çözen kısım)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ VERİTABANI: Tablolar başarıyla oluşturuldu/kontrol edildi.")
+    except Exception as e:
+        print(f"❌ VERİTABANI HATASI: {e}")
+    
+    yield  # Uygulama burada çalışmaya devam eder
+    
+    # [SHUTDOWN]: Uygulama Kapanırken Çalışır
+    print("🛑 SİSTEM: Veritabanı bağlantıları kapatılıyor...")
+    await engine.dispose()
 
-@app.get("/health")
-def health_check():
-    return {"status": "healthy", "service": "trip-service"}
+# --- 🏗️ FastAPI Uygulama Tanımı ---
+app = FastAPI(
+    title="Obilet Trip Service",
+    description="Redis ve Kafka Entegrasyonlu Asenkron Sefer Mikroservisi",
+    version="2.1.0",
+    lifespan=lifespan
+)
 
-# --- ASIL İŞİ YAPAN ENDPOINT ---
-@app.get("/api/v1/trips/cities")
-def get_cities(db: Session = Depends(get_db)):
-    cities = db.query(City).order_by(City.name).all()
-    # Sadece isimleri liste olarak döndürelim (Frontend için en kolayı)
-    return [city.name for city in cities]
+# --- 🌍 CORS Ayarları (Frontend bağlantısı için çok önemli) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"], # Geliştirme aşamasında her yere izin veriyoruz
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/")
-def root():
-    return {"message": "Trip Service is running!"}
+# --- 🛣️ Rotaları Bağlama ---
+# trips.py içindeki tüm endpoint'leri (Arama, Detay, Şehirler) buraya bağlıyoruz.
+# Artık /cities için main.py'ye kod yazmamıza gerek yok, router halledecek.
+app.include_router(
+    trips.router, 
+    prefix="/api/v1/trips", 
+    tags=["Trips"]
+)
+
+# --- 🩺 Sistem Sağlık Kontrolü ---
+@app.get("/health", tags=["System"])import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# Kendi dosyalarımızdan importlar
+from app.routers import trips
+from app.database import engine, Base
+
+# --- 🚀 Modern Lifespan Yapısı ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # [STARTUP]: Uygulama Başlarken Çalışır
+    print("🚀 Trip Service (Async) başlatılıyor...")
+    try:
+        # Tabloları asenkron olarak oluşturuyoruz (run_sync hatasını çözen kısım)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ VERİTABANI: Tablolar başarıyla oluşturuldu/kontrol edildi.")
+    except Exception as e:
+        print(f"❌ VERİTABANI HATASI: {e}")
+    
+    yield  # Uygulama burada çalışmaya devam eder
+    
+    # [SHUTDOWN]: Uygulama Kapanırken Çalışır
+    print("🛑 SİSTEM: Veritabanı bağlantıları kapatılıyor...")
+    await engine.dispose()
+
+# --- 🏗️ FastAPI Uygulama Tanımı ---
+app = FastAPI(
+    title="Obilet Trip Service",
+    description="Redis ve Kafka Entegrasyonlu Asenkron Sefer Mikroservisi",
+    version="2.2.0",
+    lifespan=lifespan
+)
+
+# --- 🌍 CORS Ayarları (Çakışmayı Önlemek İçin Güncellendi) ---
+# 'Multiple values' hatasını çözmek için "*" yerine direkt localhost:3000 yazıyoruz.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
+
+# --- 🛣️ Rotaları Bağlama ---
+app.include_router(
+    trips.router, 
+    prefix="/api/v1/trips", 
+    tags=["Trips"]
+)
+
+# --- 🩺 Sistem Sağlık Kontrolü ---
+@app.get("/health", tags=["System"])
+async def health_check():
+    return {
+        "status": "healthy", 
+        "service": "trip-service",
+        "mode": "asynchronous"
+    }
+
+@app.get("/", tags=["System"])
+async def root():
+    return {"message": "Obilet Trip Service is running on Async Engine!"}
+async def health_check():
+    return {
+        "status": "healthy", 
+        "service": "trip-service",
+        "mode": "asynchronous",
+        "database": "connected"
+    }
+
+@app.get("/", tags=["System"])
+async def root():
+    return {"message": "Obilet Trip Service is running on Async Engine!"}
