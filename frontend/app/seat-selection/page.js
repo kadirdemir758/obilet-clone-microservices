@@ -26,7 +26,7 @@ function SeatSelectionContent() {
       return;
     }
 
-    fetch(`http://localhost:8000/api/v1/trips/${tripId}`)
+    fetch(`https://kadirdemir758-obilet-trip-service.hf.space/api/v1/trips/${tripId}`)
       .then(res => res.json())
       .then(data => {
         setTrip(data);

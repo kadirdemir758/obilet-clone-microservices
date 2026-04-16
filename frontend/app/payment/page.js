@@ -68,7 +68,7 @@ function PaymentContent() {
 
       if (tripId) {
         try {
-          const res = await fetch(`http://localhost:8000/api/v1/trips/${tripId}`);
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${tripId}`);
           if (res.ok) {
             const tripData = await res.json();
             const depDate = new Date(tripData.departureTime);

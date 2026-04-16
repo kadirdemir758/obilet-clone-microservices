@@ -144,7 +144,7 @@ function ResultsContent() {
     setLoading(true);
     setError('');
 
-    const searchUrl = `http://localhost:8000/api/v1/trips/search?origin=${from}&destination=${to}&date=${date}`;
+    const searchUrl = `${process.env.NEXT_PUBLIC_API_URL}/search?origin=${from}&destination=${to}&date=${date}`;
 
     fetch(searchUrl, { cache: 'no-store' })
       .then(async (res) => {
@@ -192,7 +192,7 @@ function ResultsContent() {
 
   const handleOpenDetails = async (tripId) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/trips/${tripId}`, { cache: 'no-store' });
+      const res = await fetch(`https://kadirdemir758-obilet-trip-service.hf.space/api/v1/trips/${tripId}`);
       if (!res.ok) throw new Error('Detaylar getirilemedi');
       const data = await res.json();
       setSelectedTripDetails(data);
