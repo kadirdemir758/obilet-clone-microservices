@@ -81,3 +81,6 @@ kafka_data/
 zookeeper_data/
 zookeeper_logs/
 redisinsight_data/
+
+.env
+.env.microservices

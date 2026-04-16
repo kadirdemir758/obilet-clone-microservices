@@ -8,16 +8,19 @@ class Settings(BaseSettings):
     service_port: int = 8001
 
     # ── Veritabanı ────────────────────────────────────────────
-    database_url: str = "postgresql+asyncpg://obilet:obilet123@postgres:5432/obiletdb"
+    # Şifreler silindi, .env'den okunacak
+    database_url: str 
 
     # ── Redis ─────────────────────────────────────────────────
-    redis_url: str = "redis://:redis123@redis:6379/0"
+    # Şifreler silindi, .env'den okunacak
+    redis_url: str 
 
     # ── Kafka ─────────────────────────────────────────────────
     kafka_bootstrap_servers: str = "kafka:9092"
 
     # ── JWT ───────────────────────────────────────────────────
-    secret_key: str = "obilet-super-secret-jwt-key-CHANGE-IN-PRODUCTION-at-least-32-chars"
+    # Gizli anahtar silindi, .env'den okunacak
+    secret_key: str 
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7

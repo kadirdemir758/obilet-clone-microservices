@@ -1,10 +1,17 @@
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timedelta
 
-# Veritabanı Bağlantısı
-DATABASE_URL = "postgresql://obilet:obilet123@postgres:5432/obiletdb"
+# .env dosyasını yükle
+load_dotenv()
+
+# Veritabanı Bağlantısını Güvenli Bir Şekilde Al
+# Senkron çalıştığı için '+asyncpg' takısını otomatik temizliyoruz
+raw_db_url = os.getenv("DATABASE_URL")
+DATABASE_URL = raw_db_url.replace("+asyncpg", "") if raw_db_url else ""
+
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -68,7 +75,7 @@ def seed_data():
             # Kütahya -> İstanbul
             Trip(origin="Kütahya", destination="İstanbul", departure_time=now + timedelta(hours=2), price=450.0, company_id=comp_ids[0]),
             Trip(origin="Kütahya", destination="İstanbul", departure_time=now + timedelta(hours=5), price=480.0, company_id=comp_ids[1]),
-            Trip(origin="Kütahya", destination="İstanbul", departure_time=now + timedelta(days=1, hours=1), price=400.0, available_seats=22, company_id=comp_ids[0]), # Yeni
+            Trip(origin="Kütahya", destination="İstanbul", departure_time=now + timedelta(days=1, hours=1), price=400.0, available_seats=22, company_id=comp_ids[0]),
             
             # Ankara -> İzmir
             Trip(origin="Ankara", destination="İzmir", departure_time=now + timedelta(days=1, hours=3), price=600.0, company_id=comp_ids[2]),
@@ -76,10 +83,10 @@ def seed_data():
             # İstanbul -> Ankara
             Trip(origin="İstanbul", destination="Ankara", departure_time=now + timedelta(hours=8), price=550.0, company_id=comp_ids[0]),
             
-            # Antalya -> Ankara (Yeni)
+            # Antalya -> Ankara 
             Trip(origin="Antalya", destination="Ankara", departure_time=now + timedelta(hours=14), price=650.0, available_seats=15, company_id=comp_ids[1]),
             
-            # Bursa -> İzmir (Yeni)
+            # Bursa -> İzmir 
             Trip(origin="Bursa", destination="İzmir", departure_time=now + timedelta(days=1, hours=6), price=380.0, available_seats=4, company_id=comp_ids[2])
         ]
         
